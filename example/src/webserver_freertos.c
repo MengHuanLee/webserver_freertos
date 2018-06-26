@@ -214,7 +214,8 @@ static void server_thread(void *arg){
 	printf("Starting server_thread ...\n");
 
 	struct netconn *conn, *newconn;
-	err_t err;
+	struct netbuf *inbuf;
+	err_t err, err1;
 	LWIP_UNUSED_ARG(arg);
 
 	/* Create a new TCP connection handle */
@@ -229,15 +230,27 @@ static void server_thread(void *arg){
 	char data_buffer[80];
 	strcpy(data_buffer,"Hello World\n");
 	err = netconn_accept(conn, &newconn);
-	char str[80];
+	u16_t buflen;
+	char *buf;
+	if (err == ERR_OK){
+		netconn_write_partly(newconn, "Hello! You have connected to LPC1769! \n", sizeof("Hello! You have connected to LPC1769! \n"), NETCONN_COPY, 0);
+		netconn_write_partly(newconn, "Please type in message: \n", sizeof("Please type in message: \n"), NETCONN_COPY, 0);
+	}
+
+//	char str[80];
 	do {
 
 		if (err == ERR_OK) {
 			//	      http_server_netconn_serve(newconn);
-			//send(accept_fd, data_buffer,sizeof("Hello World"),0);
-			netconn_write_partly(newconn, "hello", sizeof("hello"), NETCONN_COPY, 0);
-			gets(str);
-			netconn_write_partly(newconn, str, 10, NETCONN_COPY, 0);
+//			gets(str);
+//			netconn_write_partly(newconn, str, 10, NETCONN_COPY, 0);
+			//err1 = netconn_recv(newconn, inbuf);
+			err1 = netconn_recv(newconn, &inbuf);
+			netbuf_data(inbuf, (void**)&buf, &buflen);
+//			printf(*buf);
+//			printf(buf);
+			netconn_write_partly(newconn, "You typed: ", sizeof("You typed: "), NETCONN_COPY, 0);
+			netconn_write_partly(newconn, buf, buflen, NETCONN_COPY, 0);
 			//netconn_delete(newconn);
 		}
 	} while(err == ERR_OK);
