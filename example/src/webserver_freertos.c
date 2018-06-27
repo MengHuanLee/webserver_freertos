@@ -231,117 +231,35 @@ static void server_thread(void *arg){
 	strcpy(data_buffer,"Hello World\n");
 	err = netconn_accept(conn, &newconn);
 	u16_t buflen;
-	char *buf;
+	void *buf;
 	if (err == ERR_OK){
 		netconn_write_partly(newconn, "Hello! You have connected to LPC1769! \n", sizeof("Hello! You have connected to LPC1769! \n"), NETCONN_COPY, 0);
 		netconn_write_partly(newconn, "Please type in message: \n", sizeof("Please type in message: \n"), NETCONN_COPY, 0);
 	}
 
-//	char str[80];
-	do {
+	while ((err = netconn_recv(newconn, &inbuf)) == ERR_OK) {
+	        /*printf("Recved\n");*/
+	        do {
+	             netbuf_data(inbuf, &buf, &buflen);
+	             netconn_write(newconn, "[LPCNOD1] You typed: ", 21, NETCONN_COPY);
+	             netconn_write(newconn, buf, buflen, NETCONN_COPY);
 
-		if (err == ERR_OK) {
-			//	      http_server_netconn_serve(newconn);
-//			gets(str);
-//			netconn_write_partly(newconn, str, 10, NETCONN_COPY, 0);
-			//err1 = netconn_recv(newconn, inbuf);
-			err1 = netconn_recv(newconn, &inbuf);
-			netbuf_data(inbuf, (void**)&buf, &buflen);
-//			printf(*buf);
-//			printf(buf);
-			netconn_write_partly(newconn, "You typed: ", sizeof("You typed: "), NETCONN_COPY, 0);
-			netconn_write_partly(newconn, buf, buflen, NETCONN_COPY, 0);
-			//netconn_delete(newconn);
-		}
-	} while(err == ERR_OK);
-	LWIP_DEBUGF(HTTPD_DEBUG,
-			("http_server_netconn_thread: netconn_accept received error %d, shutting down",
-					err));
+
+	        } while (netbuf_next(inbuf) >= 0);
+	        netbuf_delete(inbuf);
+	      }
+
+//
+//	LWIP_DEBUGF(HTTPD_DEBUG,
+//			("http_server_netconn_thread: netconn_accept received error %d, shutting down",
+//					err));
 	netconn_close(conn);
 	netconn_delete(conn);
 
 
 
-
-//	while(1){
-//		scanf("%s", str);
-//		send(accept_fd, str,sizeof(str),0);
-//	}
-//
-//	if(sent_data < 0 )
-//	{
-//
-//		printf("send failed\n");
-//		close(socket_fd);
-//		exit(3);
-//	}
-//	printf("Send Completed...\n");
-//
-//	close(socket_fd);
 }
 
-void client(){
-	int socket_fd;
-	struct sockaddr_in sa,ra;
-
-	int recv_data; char data_buffer[80]; /* Creates an TCP socket (SOCK_STREAM) with Internet Protocol Family (PF_INET).
-	 * Protocol family and Address family related. For example PF_INET Protocol Family and AF_INET family are coupled.
-	 */
-
-	socket_fd = socket(PF_INET, SOCK_STREAM, 0);
-
-	if ( socket_fd < 0 )
-	{
-
-		printf("socket call failed");
-		exit(0);
-	}
-
-	memset(&sa, 0, sizeof(struct sockaddr_in));
-	sa.sin_family = AF_INET;
-	sa.sin_addr.s_addr = inet_addr(SENDER_IP_ADDR);
-	sa.sin_port = htons(SENDER_PORT_NUM);
-
-
-	/* Bind the TCP socket to the port SENDER_PORT_NUM and to the current
-	 * machines IP address (Its defined by SENDER_IP_ADDR).
-	 * Once bind is successful for UDP sockets application can operate
-	 * on the socket descriptor for sending or receiving data.
-	 */
-	if (bind(socket_fd, (struct sockaddr *)&sa, sizeof(struct sockaddr_in)) == -1)
-	{
-		printf("Bind to Port Number %d ,IP address %s failed\n",SENDER_PORT_NUM,SENDER_IP_ADDR);
-		close(socket_fd);
-		exit(1);
-	}
-	/* Receiver connects to server ip-address. */
-
-	memset(&ra, 0, sizeof(struct sockaddr_in));
-	ra.sin_family = AF_INET;
-	ra.sin_addr.s_addr = inet_addr(SERVER_IP_ADDR);
-	ra.sin_port = htons(SERVER_PORT_NUM);
-
-
-	if(connect(socket_fd,(struct sockaddr_in*)&ra,sizeof(struct sockaddr_in)) < 0)
-	{
-
-		printf("connect failed \n");
-		close(socket_fd);
-		exit(2);
-	}
-	recv_data = recv(socket_fd,data_buffer,sizeof(data_buffer),0);
-	if(recv_data < 0)
-	{
-
-		printf("recv failed \n");
-		close(socket_fd);
-		exit(2);
-	}
-	data_buffer[recv_data] = '\0';
-	printf("received data: %s\n",data_buffer);
-
-	close(socket_fd);
-}
 
 /*****************************************************************************
  * Public functions

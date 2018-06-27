@@ -95,7 +95,7 @@
 #define TCP_MSS                         1460
 #define TCP_SND_BUF                     (2 * TCP_MSS)
 
-#define LWIP_SOCKET                     1
+#define LWIP_SOCKET                     0
 #define LWIP_NETCONN                    (NO_SYS == 0)
 #define MEMP_NUM_SYS_TIMEOUT            300
 
