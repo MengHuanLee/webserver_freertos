@@ -53,11 +53,6 @@
 #include "arch/sys_arch.h"
 #include "lpc_phy.h"/* For the PHY monitor support */
 
-#define SENDER_PORT_NUM 6000
-#define SENDER_IP_ADDR "192.168.0.1"
-
-#define SERVER_PORT_NUM 6001
-#define SERVER_IP_ADDR "192.168.0.3"
 
 /*****************************************************************************
  * Private types/enumerations/variables
@@ -65,8 +60,6 @@
 
 /* NETIF data */
 static struct netif lpc_netif;
-static void server_thread(void *arg);
-void client();
 
 /*****************************************************************************
  * Public types/enumerations/variables
@@ -77,6 +70,8 @@ void client();
  ****************************************************************************/
 
 extern void http_server_netconn_init(void);
+static void tcp_server_init();
+static void tcp_server_thread(void *arg);
 
 /* Sets up system hardware */
 static void prvSetupHardware(void)
@@ -125,7 +120,6 @@ static void vSetupIFTask(void *pvParameters) {
 	IP4_ADDR(&ipaddr, 192, 168, 0, 3);
 	IP4_ADDR(&netmask, 255, 255, 255, 0);
 #endif
-	//printf(&ipaddr);
 
 	/* Add netif interface for lpc17xx_8x */
 	memset(&lpc_netif, 0, sizeof(lpc_netif));
@@ -149,10 +143,8 @@ static void vSetupIFTask(void *pvParameters) {
 	http_server_netconn_init();
 
 	/* Start server task*/
-	printf("checkpoint before server session...\n");
-	sys_thread_new("server_netconn", server_thread, NULL, DEFAULT_THREAD_STACKSIZE + 128, DEFAULT_THREAD_PRIO);
-	//sys_thread_new("client_netconn", client, NULL, DEFAULT_THREAD_STACKSIZE + 128, DEFAULT_THREAD_PRIO);
-
+	printf("Starting server thread...\n");
+	tcp_server_init();
 
 	/* This loop monitors the PHY link and will handle cable events
 	   via the PHY driver. */
@@ -209,55 +201,60 @@ static void vSetupIFTask(void *pvParameters) {
 	}
 }
 
+static void tcp_server_init(){
+	sys_thread_new("server_netconn", tcp_server_thread, NULL, DEFAULT_THREAD_STACKSIZE + 128, DEFAULT_THREAD_PRIO);
+}
 
-static void server_thread(void *arg){
+static void tcp_server_thread(void *arg){
 	printf("Starting server_thread ...\n");
 
 	struct netconn *conn, *newconn;
-	struct netbuf *inbuf;
-	err_t err, err1;
+	err_t err;
 	LWIP_UNUSED_ARG(arg);
 
-	/* Create a new TCP connection handle */
+	/* Create a new connection identifier. */
 	conn = netconn_new(NETCONN_TCP);
-	LWIP_ERROR("http_server: invalid conn", (conn != NULL), return;);
 
-	/* Bind to port 6001 with default IP address */
+	/* Bind connection to well known port number 6001. */
 	netconn_bind(conn, NULL, 6001);
 
-	/* Put the connection into LISTEN state */
+	/* Tell connection to go into listening mode. */
 	netconn_listen(conn);
-	char data_buffer[80];
-	strcpy(data_buffer,"Hello World\n");
-	err = netconn_accept(conn, &newconn);
-	u16_t buflen;
-	void *buf;
-	if (err == ERR_OK){
-		netconn_write_partly(newconn, "Hello! You have connected to LPC1769! \n", sizeof("Hello! You have connected to LPC1769! \n"), NETCONN_COPY, 0);
-		netconn_write_partly(newconn, "Please type in message: \n", sizeof("Please type in message: \n"), NETCONN_COPY, 0);
+
+	while (1) {
+		printf("Waiting connection...\n");
+		/* Grab new connection. */
+		err = netconn_accept(conn, &newconn);
+		printf("Accepted a new connection %p\n", newconn);
+		/* Process the new connection. */
+		if (err == ERR_OK) {
+			struct netbuf *buf;
+			void *data;
+			u16_t len;
+			/* Send out greeting message. */
+			netconn_write(newconn, "Hello! You have connected to LPC1769! \n", sizeof("Hello! You have connected to LPC1769! \n"), NETCONN_COPY);
+			netconn_write(newconn, "Please type in message: \n", sizeof("Please type in message: \n"), NETCONN_COPY);
+
+			while ((err = netconn_recv(newconn, &buf)) == ERR_OK) {
+				/*printf("Recved\n");*/
+				do {
+					netbuf_data(buf, &data, &len);
+					err = netconn_write(newconn, data, len, NETCONN_COPY);
+					printf("[PC_NOD] %.*s", len, data);
+
+					if (err != ERR_OK) {
+						printf("tcpecho: netconn_write: error \"%s\"\n", lwip_strerr(err));
+					}
+
+				} while (netbuf_next(buf) >= 0);
+				netbuf_delete(buf);
+			}
+			printf("Client disconnected. Close and delete connection... \n");
+			/* Close connection and discard connection identifier. */
+			netconn_close(newconn);
+			netconn_delete(newconn);
+		}
 	}
-
-	while ((err = netconn_recv(newconn, &inbuf)) == ERR_OK) {
-	        /*printf("Recved\n");*/
-	        do {
-	             netbuf_data(inbuf, &buf, &buflen);
-	             netconn_write(newconn, "[LPCNOD1] You typed: ", 21, NETCONN_COPY);
-	             netconn_write(newconn, buf, buflen, NETCONN_COPY);
-
-
-	        } while (netbuf_next(inbuf) >= 0);
-	        netbuf_delete(inbuf);
-	      }
-
-//
-//	LWIP_DEBUGF(HTTPD_DEBUG,
-//			("http_server_netconn_thread: netconn_accept received error %d, shutting down",
-//					err));
-	netconn_close(conn);
-	netconn_delete(conn);
-
-
-
 }
 
 
