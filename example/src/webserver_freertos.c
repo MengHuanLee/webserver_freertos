@@ -40,7 +40,6 @@
 #include "netif/etharp.h"
 #include "lwip/sockets.h"
 
-
 #if LWIP_DHCP
 #include "lwip/dhcp.h"
 #endif
@@ -57,6 +56,8 @@
 /*****************************************************************************
  * Private types/enumerations/variables
  ****************************************************************************/
+#define TCP_PORT 6001
+
 
 /* NETIF data */
 static struct netif lpc_netif;
@@ -215,8 +216,8 @@ static void tcp_server_thread(void *arg){
 	/* Create a new connection identifier. */
 	conn = netconn_new(NETCONN_TCP);
 
-	/* Bind connection to well known port number 6001. */
-	netconn_bind(conn, NULL, 6001);
+	/* Bind connection to port number PORT. */
+	netconn_bind(conn, NULL, TCP_PORT);
 
 	/* Tell connection to go into listening mode. */
 	netconn_listen(conn);
